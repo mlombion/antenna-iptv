@@ -8,6 +8,7 @@ import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.PixelFormat
+import android.graphics.Rect
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -59,7 +60,25 @@ class PointerService : AccessibilityService() {
     private val hide = Runnable { cursor?.animate()?.alpha(0f)?.setDuration(400)?.start() }
     private var scrollAccum = 0f
     private var scrollAccumX = 0f
-    private var gestureBusy = false
+    private var lastMove = 0L
+    /** The arrow's tip stops short of the bottom and right edges so part of it always stays on screen. */
+    private var maxX = 1919f
+    private var maxY = 1079f
+    /** While the cursor rests at the top or bottom edge, the page keeps scrolling that way. */
+    private val edgeScroll = object : Runnable {
+        override fun run() {
+            val zone = height * 0.035f
+            val recent = System.currentTimeMillis() - lastMove < 5000
+            when {
+                !recent -> return
+                y >= maxY - zone -> scrollStep(Dir.DOWN)
+                y <= zone -> scrollStep(Dir.UP)
+                else -> return
+            }
+            main.postDelayed(this, 650)
+        }
+    }
+    private enum class Dir { UP, DOWN, LEFT, RIGHT }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -74,6 +93,8 @@ class PointerService : AccessibilityService() {
         val c = CursorView(this).apply { alpha = 0f }
         val size = (width / 48).toInt().coerceIn(28, 64)
         root.addView(c, FrameLayout.LayoutParams(size, (size * 1.4f).toInt()))
+        maxX = width - size * 0.4f
+        maxY = height - size * 0.6f
         val lp = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
@@ -140,16 +161,24 @@ class PointerService : AccessibilityService() {
             "enter" -> focusedInput()?.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id)
             "show" -> place()
             "center" -> { x = width / 2; y = height / 2; place() }
+            // Diagnostics: what a click would press here, without pressing it.
+            "probe" -> Log.i(TAG, "at ${x.toInt()},${y.toInt()}: " + (actionableAt(x.toInt(), y.toInt(), AccessibilityNodeInfo.ACTION_CLICK)
+                ?.let { "${it.className} '${it.text ?: it.contentDescription ?: ""}' clickable=${it.isClickable} focusable=${it.isFocusable}" } ?: "nothing"))
         }
     }
 
     private fun List<String>.f(i: Int) = getOrNull(i)?.toFloatOrNull() ?: 0f
 
     private fun move(dx: Float, dy: Float) {
-        x = (x + dx * scale).coerceIn(0f, width - 1)
-        y = (y + dy * scale).coerceIn(0f, height - 1)
+        val wasInZone = inEdgeZone()
+        x = (x + dx * scale).coerceIn(0f, maxX)
+        y = (y + dy * scale).coerceIn(0f, maxY)
+        lastMove = System.currentTimeMillis()
         place()
+        if (inEdgeZone() && !wasInZone) { main.removeCallbacks(edgeScroll); main.postDelayed(edgeScroll, 350) }
     }
+
+    private fun inEdgeZone() = y >= maxY - height * 0.035f || y <= height * 0.035f
 
     private fun place() {
         val c = cursor ?: return
@@ -160,39 +189,119 @@ class PointerService : AccessibilityService() {
         main.postDelayed(hide, 5000)
     }
 
+    /**
+     * TV boxes have no touchscreen and many ignore simulated taps, so a click presses whatever is under the cursor
+     * directly (as TalkBack does): the button, card or link there. A simulated tap is the fallback for things
+     * that don't describe themselves, like games and web pages.
+     */
     private fun tap(long: Boolean) {
+        cursor?.pulse()
+        place()
+        val target = actionableAt(x.toInt(), y.toInt(), if (long) AccessibilityNodeInfo.ACTION_LONG_CLICK else AccessibilityNodeInfo.ACTION_CLICK)
+        val done = target?.let { node ->
+            val action = if (long) AccessibilityNodeInfo.ACTION_LONG_CLICK else AccessibilityNodeInfo.ACTION_CLICK
+            node.performAction(action) || (node.isFocusable && node.performAction(AccessibilityNodeInfo.ACTION_FOCUS) &&
+                performGlobalAction(GLOBAL_ACTION_DPAD_CENTER))
+        } ?: false
+        if (done) return
         val path = Path().apply { moveTo(x, y) }
         val stroke = GestureDescription.StrokeDescription(path, 0, if (long) 800 else 60)
         dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), null, null)
-        cursor?.pulse()
-        place()
+    }
+
+    /** The innermost visible item under the point, in the topmost window there (our own cursor layer excluded). */
+    private fun nodeAt(px: Int, py: Int): AccessibilityNodeInfo? {
+        val r = Rect()
+        for (w in windows.sortedByDescending { it.layer }) {
+            if (w.type == android.view.accessibility.AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) continue
+            w.getBoundsInScreen(r)
+            if (!r.contains(px, py)) continue
+            val root = w.root ?: continue
+            deepest(root, px, py, r)?.let { return it }
+        }
+        return null
+    }
+
+    private fun deepest(n: AccessibilityNodeInfo, px: Int, py: Int, r: Rect): AccessibilityNodeInfo? {
+        n.getBoundsInScreen(r)
+        if (!r.contains(px, py) || !n.isVisibleToUser) return null
+        for (i in n.childCount - 1 downTo 0) {
+            val child = n.getChild(i) ?: continue
+            deepest(child, px, py, r)?.let { return it }
+        }
+        return n
+    }
+
+    /** The item under the point, or the nearest one around it, that can do [action] (or at least take focus). */
+    private fun actionableAt(px: Int, py: Int, action: Int): AccessibilityNodeInfo? {
+        var n = nodeAt(px, py)
+        var focusable: AccessibilityNodeInfo? = null
+        var depth = 0
+        while (n != null && depth < 12) {
+            if (n.actionList.any { it.id == action } && n.isEnabled) return n
+            // Lists and grids are focusable too, but "clicking" one would open whatever happens to be highlighted.
+            if (focusable == null && n.isFocusable && !n.isScrollable && n.collectionInfo == null) focusable = n
+            n = n.parent
+            depth++
+        }
+        return focusable
     }
 
     /**
-     * Scrolling is a finger swipe on the TV, fired once the phone has dragged far enough; a swipe moves content the
-     * same way the fingers move (drag up to go down a list, like a phone).
+     * A two-finger drag scrolls like on a phone: content follows the fingers (drag up to go down a list).
+     * Each step is fired once the phone has dragged far enough.
      */
     private fun scroll(dx: Float, dy: Float) {
         scrollAccum += dy * scale
         scrollAccumX += dx * scale
+        lastMove = System.currentTimeMillis()
         place()
-        if (gestureBusy) return
-        val threshold = height / 18
-        if (abs(scrollAccum) < threshold && abs(scrollAccumX) < threshold) return
-        val sx = scrollAccumX.coerceIn(-width / 2, width / 2)
-        val sy = scrollAccum.coerceIn(-height / 2, height / 2)
-        scrollAccum = 0f; scrollAccumX = 0f
-        // Start where the cursor is, but leave room for the swipe on screen.
-        val startX = x.coerceIn(abs(sx) + 1, width - abs(sx) - 1)
-        val startY = y.coerceIn(abs(sy) + 1, height - abs(sy) - 1)
-        val path = Path().apply { moveTo(startX, startY); lineTo(startX + sx, startY + sy) }
-        val stroke = GestureDescription.StrokeDescription(path, 0, 180)
-        gestureBusy = true
-        val done = object : GestureResultCallback() {
-            override fun onCompleted(gestureDescription: GestureDescription?) { gestureBusy = false }
-            override fun onCancelled(gestureDescription: GestureDescription?) { gestureBusy = false }
+        val threshold = height / 9
+        when {
+            scrollAccum <= -threshold -> { scrollAccum = 0f; scrollAccumX = 0f; scrollStep(Dir.DOWN) }
+            scrollAccum >= threshold -> { scrollAccum = 0f; scrollAccumX = 0f; scrollStep(Dir.UP) }
+            scrollAccumX <= -threshold -> { scrollAccum = 0f; scrollAccumX = 0f; scrollStep(Dir.RIGHT) }
+            scrollAccumX >= threshold -> { scrollAccum = 0f; scrollAccumX = 0f; scrollStep(Dir.LEFT) }
         }
-        if (!dispatchGesture(GestureDescription.Builder().addStroke(stroke).build(), done, null)) gestureBusy = false
+    }
+
+    /**
+     * Scrolls the list under the cursor one step, the way TalkBack does; on screens without a scrollable list
+     * there (like Google TV's home rows), the remote's arrow does it by moving the highlight.
+     */
+    private fun scrollStep(dir: Dir) {
+        val wanted = when (dir) {
+            Dir.DOWN -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN.id
+            Dir.UP -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.id
+            Dir.RIGHT -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_RIGHT.id
+            Dir.LEFT -> AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_LEFT.id
+        }
+        val generic = if (dir == Dir.DOWN || dir == Dir.RIGHT) AccessibilityNodeInfo.ACTION_SCROLL_FORWARD else AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD
+        var n = nodeAt(x.toInt(), y.toInt())
+        var depth = 0
+        while (n != null && depth < 15) {
+            val ids = n.actionList.map { it.id }
+            if (wanted in ids && n.performAction(wanted)) return
+            // Plain forward/backward only for lists that go the right way (vertical lists for up/down).
+            if (generic in ids && n.isScrollable && matchesAxis(n, dir) && n.performAction(generic)) return
+            n = n.parent
+            depth++
+        }
+        performGlobalAction(when (dir) {
+            Dir.DOWN -> GLOBAL_ACTION_DPAD_DOWN; Dir.UP -> GLOBAL_ACTION_DPAD_UP
+            Dir.RIGHT -> GLOBAL_ACTION_DPAD_RIGHT; Dir.LEFT -> GLOBAL_ACTION_DPAD_LEFT
+        })
+    }
+
+    /** A list's direction: from its rows and columns when it says, else from its shape (rows are short and wide). */
+    private fun matchesAxis(n: AccessibilityNodeInfo, dir: Dir): Boolean {
+        val info = n.collectionInfo
+        val vertical = when {
+            info != null && info.rowCount > 1 && info.columnCount <= 1 -> true
+            info != null && info.columnCount > 1 && info.rowCount <= 1 -> false
+            else -> Rect().also { n.getBoundsInScreen(it) }.let { it.height() >= it.width() * 0.4f }
+        }
+        return if (dir == Dir.UP || dir == Dir.DOWN) vertical else !vertical
     }
 
     private fun key(name: String) {
