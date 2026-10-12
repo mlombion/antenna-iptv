@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Antenna IPTV</string>
+    <string name="pointer_label">Antenna phone remote</string>
+    <string name="pointer_description">Lets the Antenna IPTV app on your phone control this TV: a cursor you move with your phone as a trackpad or by pointing it, clicks, scrolling, the remote\'s buttons and typing. It only listens to phones on your home network.</string>
 </resources>

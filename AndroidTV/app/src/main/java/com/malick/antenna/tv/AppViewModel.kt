@@ -330,6 +330,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
             } ?: JSONObject.NULL)
             .put("vod", stremio.remoteStatus() ?: JSONObject.NULL)
             .put("stremio", stremio.signedIn)
+            .put("pointer", com.malick.antenna.tv.pointer.PointerService.running)
             .put("playing", ch?.let {
                 JSONObject().put("streamId", it.id).put("num", it.num).put("name", it.displayName)
                     .put("title", schedule(it).current?.title ?: JSONObject.NULL)

@@ -71,6 +71,9 @@ private struct PhoneTabs: View {
                 PhoneMoviePlayerView(movie: movie).environment(model)
             }
         }
+        .sheet(isPresented: $model.showRemote, onDismiss: { model.pointer.disconnect() }) {
+            PhoneRemoteView().environment(model)
+        }
         // Sits just above the floating tab bar, like a music mini-player.
         .overlay(alignment: .bottom) { CastingBar().padding(.bottom, 66) }
         .onAppear { model.cast.startBrowsing() }

@@ -19,6 +19,10 @@ struct PhoneHomeView: View {
             .background(Theme.bg)
             .toolbar {
                 ToolbarItem(placement: .principal) { BrandMark(size: 17) }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { model.showRemote = true } label: { Image(systemName: "av.remote") }
+                        .accessibilityLabel("Phone remote for your TV")
+                }
             }
             .navigationBarTitleDisplayMode(.inline)
         }

@@ -151,6 +151,20 @@ fun SettingsScreen(vm: AppViewModel) {
             }
         }
         item {
+            val on = com.malick.antenna.tv.pointer.PointerService.running
+            val context = androidx.compose.ui.platform.LocalContext.current
+            Column(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(Palette.surface).padding(20.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text("Phone remote · trackpad & air mouse", fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+                Text(if (on) "On. Open Remote in Antenna on your iPhone to move a cursor over the whole TV, click, scroll and type."
+                    else "Off. Turn on \"Antenna phone remote\" in the TV's accessibility settings to control the whole TV from your phone: a cursor, clicks, scrolling and typing.",
+                    color = Palette.muted, fontSize = 13.sp)
+                if (!on) Button(onClick = {
+                    runCatching { context.startActivity(android.content.Intent(android.provider.Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                }) { Text("Open accessibility settings") }
+            }
+        }
+        item {
             val st = vm.stremio
             Column(Modifier.padding(top = 10.dp).clip(RoundedCornerShape(12.dp)).background(Palette.surface).padding(20.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp)) {

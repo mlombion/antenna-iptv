@@ -12,8 +12,8 @@ android {
         applicationId = "com.malick.antenna.tv"
         minSdk = 26
         targetSdk = 35
-        versionCode = 8
-        versionName = "0.8"
+        versionCode = 9
+        versionName = "0.9"
         // The TV boxes are 32-bit ARM; arm64 covers newer boxes and the emulator.
         ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a") }
     }

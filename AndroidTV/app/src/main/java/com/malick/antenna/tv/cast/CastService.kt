@@ -152,6 +152,7 @@ class CastService : Service() {
 
     private fun status(): JSONObject =
         onMain { CastBridge.handler?.status() } ?: JSONObject().put("name", deviceName()).put("signedIn", false).put("state", "closed")
+            .put("pointer", com.malick.antenna.tv.pointer.PointerService.running)
 
     private fun play(body: JSONObject): Pair<Int, JSONObject> {
         body.optJSONObject("stremio")?.let { return playStremio(it) }

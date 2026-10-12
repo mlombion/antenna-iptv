@@ -155,6 +155,13 @@ final class CastManager {
         startPolling()
     }
 
+    /// The TV's address on the home network, for the phone remote's own connection.
+    func host(of device: Device) async throws -> String {
+        let base = try await resolve(device, remember: false)
+        guard let host = base.host else { throw CastError(message: "Couldn't find the TV's address.") }
+        return host
+    }
+
     func command(_ action: String, _ extra: [String: Any] = [:]) {
         guard let baseURL else { return }
         var body = extra
@@ -207,7 +214,8 @@ final class CastManager {
     }
 
     /// Turns the Bonjour service into an IPv4 address and port the HTTP requests can use.
-    private func resolve(_ device: Device) async throws -> URL {
+    /// `remember` makes it the address for commands and status; the phone remote only looks it up.
+    private func resolve(_ device: Device, remember: Bool = true) async throws -> URL {
         if active == device, let baseURL { return baseURL }
         let params = NWParameters.tcp
         if let ip = params.defaultProtocolStack.internetProtocol as? NWProtocolIP.Options { ip.version = .v4 }
@@ -236,7 +244,7 @@ final class CastManager {
             }
             connection.start(queue: .main)
         }
-        baseURL = url
+        if remember { baseURL = url }
         return url
     }
 }

@@ -80,6 +80,9 @@ final class AppModel {
     let settings = AppSettings()
     let player = PlayerController()
     let cast = CastManager()
+    /// The phone remote for the whole TV (trackpad, air mouse, buttons).
+    let pointer = PointerClient()
+    var showRemote = false
     /// Movies & Series from the user's Stremio account and add-ons (played on an Antenna TV).
     let stremio = StremioStore()
     /// The movie or episode playing on this device, and its player (separate from live TV's).

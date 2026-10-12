@@ -29,6 +29,14 @@ struct PhoneSettingsView: View {
                 }
 
                 Section {
+                    Button { model.showRemote = true } label: {
+                        Label("Phone remote for your TV", systemImage: "av.remote")
+                    }
+                } footer: {
+                    Text("Use this iPhone as a trackpad or air mouse for the whole TV or projector, not just Antenna. Turn on \"Antenna phone remote\" once in the TV's accessibility settings.")
+                }
+
+                Section {
                     Picker("Rewind buffer", selection: $settings.rewindMinutes) {
                         Text("Off").tag(0)
                         Text("15 minutes").tag(15)

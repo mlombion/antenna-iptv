@@ -26,6 +26,12 @@ Built to replace IPTV Smarters Pro: it opens fast, stays open, and looks like a 
 - From the iPhone or Mac, send a channel, movie or episode to an Antenna TV on the same Wi-Fi
 - The phone becomes the remote: pause, seek, ±10/30 s, subtitles, audio, next episode, volume
 
+**Phone remote for the whole TV**
+- Use the iPhone as a **trackpad** for the TV or projector: a cursor appears on screen in every app (Google TV home,
+  YouTube, Settings…). Tap to click, two fingers to scroll, Back / Home / volume buttons
+- **Air mouse:** hold your thumb on the screen and point the phone at the TV, the cursor follows
+- The remote's arrows and OK, and a keyboard that types into the TV's search boxes
+
 ## Install
 
 Get the files from the [latest release](../../releases/latest).
@@ -60,6 +66,16 @@ The first time, allow the app under *Settings → General → VPN & Device Manag
    page (Facebook, Apple or email); Antenna only receives a session key.
 3. **Play on TV:** install Antenna on the TV and keep it on the same Wi-Fi as your phone. A TV button appears
    in the player and next to sources.
+
+### Turning on the phone remote (once per TV)
+The TV part of the remote is an accessibility service, so Android asks you to allow it:
+1. On the TV: *Settings → System → Accessibility → Antenna phone remote → On* (Antenna's own Settings screen has a
+   shortcut). If it's greyed out, first open *Settings → Apps → Antenna IPTV* and choose *Allow restricted settings*.
+2. Or from a computer: `adb shell appops set com.malick.antenna.tv ACCESS_RESTRICTED_SETTINGS allow` then
+   `adb shell settings put secure enabled_accessibility_services com.malick.antenna.tv/com.malick.antenna.tv.pointer.PointerService`.
+3. On the iPhone: the remote button at the top of Home, or *Settings → Phone remote for your TV*.
+
+It only accepts phones on your home network, and it can only tap, scroll and press buttons where you point.
 
 ## Privacy
 Antenna has no server and collects nothing. It connects to your IPTV provider and, if you use Movies & Series,

@@ -26,3 +26,6 @@ AndroidTV/.idea/
 # macOS
 .DS_Store
 __pycache__/
+
+# Personal device scripts (not shared)
+Local/
