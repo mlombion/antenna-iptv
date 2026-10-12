@@ -25,6 +25,14 @@ struct PhoneRemoteView: View {
                     .pickerStyle(.segmented)
                     .padding(.horizontal, 16)
 
+                if pointer.state == .connected && pointer.arrowMode && mode != .buttons {
+                    Label("This app uses the remote's arrows: move to step the highlight, tap for OK.", systemImage: "arrow.up.and.down.and.arrow.left.and.right")
+                        .font(.system(size: 12.5, weight: .medium))
+                        .foregroundStyle(Theme.accentInk)
+                        .padding(.horizontal, 12).padding(.vertical, 8)
+                        .background(Theme.accent, in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.horizontal, 16)
+                }
                 Group {
                     switch pointer.state {
                     case .connected:

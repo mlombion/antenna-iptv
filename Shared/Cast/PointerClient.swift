@@ -15,6 +15,8 @@ final class PointerClient {
 
     private(set) var state: State = .idle
     private(set) var device: CastManager.Device?
+    /** True when the app on the TV can't be pointed at (YouTube): movement then steps the highlight. */
+    private(set) var arrowMode = false
 
     @ObservationIgnored private var connection: NWConnection?
     @ObservationIgnored private var pendingMove = CGPoint.zero
@@ -50,6 +52,7 @@ final class PointerClient {
                 case .ready:
                     self.state = .connected
                     self.send("show")
+                    self.receive(on: c, buffer: Data())
                 case .failed, .waiting:
                     self.state = .failed("The phone remote is off on this TV. On the TV, open Antenna → Settings → Phone remote, or Settings → Accessibility → Antenna phone remote, and turn it on.")
                     c.cancel()
@@ -68,11 +71,29 @@ final class PointerClient {
         }
     }
 
+    /** Reads the TV's lines: "mode arrows" / "mode pointer". */
+    private func receive(on c: NWConnection, buffer: Data) {
+        c.receive(minimumIncompleteLength: 1, maximumLength: 4096) { [weak self] data, _, done, error in
+            Task { @MainActor in
+                guard let self, self.connection === c else { return }
+                var buf = buffer
+                if let data { buf.append(data) }
+                while let nl = buf.firstIndex(of: 10) {
+                    let line = String(decoding: buf[buf.startIndex..<nl], as: UTF8.self)
+                    buf.removeSubrange(buf.startIndex...nl)
+                    if line.hasPrefix("mode ") { self.arrowMode = line == "mode arrows" }
+                }
+                if !done && error == nil { self.receive(on: c, buffer: buf) }
+            }
+        }
+    }
+
     func disconnect() {
         flushTask?.cancel()
         connection?.cancel()
         connection = nil
         device = nil
+        arrowMode = false
         state = .idle
     }
 
