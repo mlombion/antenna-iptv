@@ -110,6 +110,9 @@ class PointerService : AccessibilityService() {
         cursor = c
         startServer()
         main.postDelayed(checkMode, 500)
+        // Android brings this service back on its own (after updates too), so it also makes sure the TV is
+        // findable by phones (the "Play on TV" service normally starts with the app or at boot).
+        com.malick.antenna.tv.cast.CastService.start(this)
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {

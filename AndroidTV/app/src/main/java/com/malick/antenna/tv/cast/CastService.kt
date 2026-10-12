@@ -200,9 +200,10 @@ class CastService : Service() {
         runCatching { runBlocking { withContext(Dispatchers.Main) { block() } } }.getOrNull()
 }
 
-/** Starts the listener when the box turns on, so phones can find the TV without opening the app first. */
+/** Starts the listener when the box turns on or Antenna is updated, so phones can find the TV without opening the app first. */
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) CastService.start(context)
+        // At boot, and after Antenna is updated (an update stops its services).
+        if (intent.action == Intent.ACTION_BOOT_COMPLETED || intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) CastService.start(context)
     }
 }
