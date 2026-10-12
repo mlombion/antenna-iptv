@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Most IPTV providers serve plain http, so the app must be allowed to load it. -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Antenna connects to your IPTV provider and finds your TV on your home network so you can play channels on it.</string>
+	<key>NSBonjourServices</key>
+	<array>
+		<string>_antenna._tcp</string>
+	</array>
+</dict>
+</plist>

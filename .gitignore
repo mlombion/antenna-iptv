@@ -1,0 +1,28 @@
+# Build output and downloaded dependencies
+.build/
+build/
+DerivedData/
+*.xcuserstate
+xcuserdata/
+.swiftpm/
+
+# Built libtorrent (run Tools/build_libtorrent.sh)
+Vendor/
+
+# Release packages go on the GitHub release page, not in the repository
+Release/
+*.dmg
+*.ipa
+*.apk
+
+# Android
+AndroidTV/.gradle/
+AndroidTV/build/
+AndroidTV/app/build/
+AndroidTV/local.properties
+AndroidTV/.idea/
+*.iml
+
+# macOS
+.DS_Store
+__pycache__/
