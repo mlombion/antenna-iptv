@@ -80,6 +80,12 @@ class PointerService : AccessibilityService() {
     @Volatile private var arrowMode = false
     /** A click in progress that's walking the highlight to its target; a new click cancels it. */
     private var walkId = 0
+    /** Arrow mode only starts if the screen still can't be pointed at on a second look (screens load in steps). */
+    private var arrowsSeen = 0
+    private var overlayParams: WindowManager.LayoutParams? = null
+    private var keepingAwake = false
+    /** The TV goes back to its normal screensaver timing a few minutes after the phone was last used. */
+    private val stopKeepingAwake = Runnable { keepAwake(false) }
 
     // ---- Lifecycle
 
@@ -106,6 +112,7 @@ class PointerService : AccessibilityService() {
             PixelFormat.TRANSLUCENT,
         ).apply { gravity = Gravity.TOP or Gravity.START }
         runCatching { wm.addView(root, lp) }.onFailure { Log.w(TAG, "Couldn't add the cursor", it) }
+        overlayParams = lp
         overlay = root
         cursor = c
         startServer()
@@ -173,7 +180,13 @@ class PointerService : AccessibilityService() {
 
     private fun command(line: String) {
         val parts = line.trim().split(' ')
-        when (parts.getOrNull(0)) {
+        val verb = parts.getOrNull(0)
+        if (verb != "probe" && verb != "show") {
+            keepAwake(true)
+            // The screensaver is on: the first touch only wakes the TV, as a remote button would.
+            if (screensaverShowing()) { if (verb != "m" || abs(parts.f(1)) + abs(parts.f(2)) > 4) wake(); return }
+        }
+        when (verb) {
             "m" -> move(parts.f(1), parts.f(2))
             "c" -> click(long = false)
             "lc" -> click(long = true)
@@ -248,15 +261,52 @@ class PointerService : AccessibilityService() {
      * Some apps (YouTube) draw their whole screen themselves and only expose empty placeholders, so nothing can be
      * pointed at. There the cursor hides and the phone's movement steps the highlight instead.
      */
-    private val checkMode = Runnable {
-        val arrows = !pointable(rootInActiveWindow)
+    private val checkMode: Runnable = Runnable {
+        main.removeCallbacks(recheckMode)
+        val root = mainAppWindowRoot()
+        val looksArrows = root != null && !root.packageName.toString().contains("dream") && !pointable(root)
+        // Back to the cursor at once; arrows only if a second look a moment later agrees.
+        arrowsSeen = if (looksArrows) arrowsSeen + 1 else 0
+        if (looksArrows && arrowsSeen < 2) { main.postDelayed(recheckMode, 900); return@Runnable }
+        val arrows = looksArrows
         if (arrows != arrowMode) {
             arrowMode = arrows
             arrowX = 0f; arrowY = 0f
             if (arrows) { main.removeCallbacks(hide); cursor?.animate()?.alpha(0f)?.setDuration(200)?.start() } else place()
             tell("mode ${if (arrows) "arrows" else "pointer"}")
-            Log.i(TAG, "mode ${if (arrows) "arrows" else "pointer"} for ${rootInActiveWindow?.packageName}")
+            Log.i(TAG, "mode ${if (arrows) "arrows" else "pointer"} for ${root?.packageName}")
         }
+        // Apps change what's on screen without new windows (YouTube's player, menus): look again now and then.
+        if (phones.isNotEmpty()) main.postDelayed(recheckMode, 3000)
+    }
+    private val recheckMode = Runnable { checkMode.run() }
+
+    /** The full-screen app the user is looking at, ignoring system pop-ups (XGIMI's overlays, volume, toasts). */
+    private fun mainAppWindowRoot(): AccessibilityNodeInfo? {
+        val apps = windows.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION }
+        val w = apps.firstOrNull { it.isActive } ?: apps.firstOrNull { it.isFocused } ?: apps.maxByOrNull { it.layer }
+        return w?.root ?: rootInActiveWindow
+    }
+
+    private fun screensaverShowing(): Boolean =
+        windows.any { it.isActive && it.root?.packageName?.toString()?.let { p -> p.contains("dream") } == true }
+
+    private fun wake() {
+        Log.i(TAG, "waking from the screensaver")
+        performGlobalAction(GLOBAL_ACTION_BACK)
+        main.postDelayed(checkMode, 800)
+    }
+
+    /** While the phone is in use, the cursor layer asks the TV to stay awake (no screensaver mid-use). */
+    private fun keepAwake(on: Boolean) {
+        main.removeCallbacks(stopKeepingAwake)
+        if (on) main.postDelayed(stopKeepingAwake, 4 * 60_000L)
+        if (on == keepingAwake) return
+        val lp = overlayParams ?: return
+        val root = overlay ?: return
+        lp.flags = if (on) lp.flags or WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON else lp.flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON.inv()
+        runCatching { getSystemService(WindowManager::class.java).updateViewLayout(root, lp) }
+        keepingAwake = on
     }
 
     /** True when the screen describes at least a few real things (buttons, text, cards) of a usable size. */
@@ -372,14 +422,18 @@ class PointerService : AccessibilityService() {
     /** The innermost visible item under the point, in the topmost window there (our own cursor layer excluded). */
     private fun nodeAt(px: Int, py: Int): AccessibilityNodeInfo? {
         val r = Rect()
+        var first: AccessibilityNodeInfo? = null
         for (w in windows.sortedByDescending { it.layer }) {
             if (w.type == AccessibilityWindowInfo.TYPE_ACCESSIBILITY_OVERLAY) continue
             w.getBoundsInScreen(r)
             if (!r.contains(px, py)) continue
             val root = w.root ?: continue
-            deepest(root, px, py, r)?.let { return it }
+            val hit = deepest(root, px, py, r) ?: continue
+            // An invisible system layer on top (XGIMI draws some) has nothing to press: look underneath it.
+            if (ancestor(hit) { it.isClickable || it.isFocusable || it.isScrollable } != null) return hit
+            if (first == null) first = hit
         }
-        return null
+        return first
     }
 
     private fun deepest(n: AccessibilityNodeInfo, px: Int, py: Int, r: Rect): AccessibilityNodeInfo? {
