@@ -1,7 +1,7 @@
 # Antenna IPTV
 
 A fast, modern player for your **IPTV subscription** (Xtream Codes) and your **Stremio** library, on **Mac,
-iPhone and Android TV** (Google TV boxes, projectors), with your phone as a remote.
+iPhone, Android phones and Android TV** (Google TV boxes, projectors), with your phone as a remote.
 
 Built to replace IPTV Smarters Pro: it opens fast, stays open, and looks like a streaming app.
 
@@ -13,7 +13,8 @@ Built to replace IPTV Smarters Pro: it opens fast, stays open, and looks like a 
 - Channels by category, favorites, recently watched, and a TV guide grid
 - Search channels *and* shows: type "Formula 1" to see which channels show it now or later today
 - Rewind and pause live TV (the channel you're watching is recorded locally, 30 min by default)
-- Picture in picture on Mac and iPhone (swipe home on iPhone and it floats)
+- Picture in picture on Mac, iPhone and Android phones (go home while watching and it floats)
+- On phones: swipe sideways to change channel, up and down for volume and brightness, double-tap to skip 10 s
 
 **Movies & Series** (optional, with a Stremio account)
 - Your Stremio library, Continue Watching and installed add-ons: catalogs, search, episodes, sources
@@ -23,11 +24,11 @@ Built to replace IPTV Smarters Pro: it opens fast, stays open, and looks like a 
 - Low-storage mode: files bigger than your free space stream anyway, deleting what you've watched as you go
 
 **Play on TV**
-- From the iPhone or Mac, send a channel, movie or episode to an Antenna TV on the same Wi-Fi
+- From the iPhone, an Android phone or the Mac, send a channel, movie or episode to an Antenna TV on the same Wi-Fi
 - The phone becomes the remote: pause, seek, ±10/30 s, subtitles, audio, next episode, volume
 
 **Phone remote for the whole TV**
-- Use the iPhone as a **trackpad** for the TV or projector: a cursor appears on screen in every app (Google TV home,
+- Use the iPhone or Android phone as a **trackpad** for the TV or projector: a cursor appears on screen in every app (Google TV home,
   YouTube, Settings…). Tap to click, two fingers to scroll, Back / Home / volume buttons
 - **Air mouse:** hold your thumb on the screen and point the phone at the TV, the cursor follows
 - The remote's arrows and OK, and a keyboard that types into the TV's search boxes
@@ -40,12 +41,17 @@ Get the files from the [latest release](../../releases/latest).
 Download `Antenna-IPTV-<version>.dmg`, open it and drag **Antenna IPTV** to Applications. It's signed and
 notarized by Apple, so it opens normally.
 
-### Android TV / Google TV (Android 8+)
-Download `Antenna-IPTV-AndroidTV-<version>.apk` and install it on the TV, either:
+### Android TV / Google TV and Android phones (Android 8+)
+One file for both: `Antenna-IPTV-Android-<version>.apk` shows the TV screens on a TV and the touch screens on a phone.
+
+**On a phone:** open the APK's link on the phone, tap the downloaded file and allow your browser to install apps when
+Android asks (*Install unknown apps*).
+
+**On the TV**, either:
 - **With the Downloader app** (from the TV's app store): turn on *Settings → Apps → Security → Unknown sources*
   for Downloader, then open the APK's link in Downloader; or
 - **From a computer** with adb: enable developer options and network debugging on the TV, then
-  `adb connect <tv-ip>:5555` and `adb install Antenna-IPTV-AndroidTV-<version>.apk`.
+  `adb connect <tv-ip>:5555` and `adb install Antenna-IPTV-Android-<version>.apk`.
 
 To sign in, the TV shows a QR code: scan it with your phone and type your IPTV details there instead of with the
 remote.
@@ -73,7 +79,8 @@ The TV part of the remote is an accessibility service, so Android asks you to al
    shortcut). If it's greyed out, first open *Settings → Apps → Antenna IPTV* and choose *Allow restricted settings*.
 2. Or from a computer: `adb shell appops set com.malick.antenna.tv ACCESS_RESTRICTED_SETTINGS allow` then
    `adb shell settings put secure enabled_accessibility_services com.malick.antenna.tv/com.malick.antenna.tv.pointer.PointerService`.
-3. On the iPhone: the remote button at the top of Home, or *Settings → Phone remote for your TV*.
+3. On the iPhone: the remote button at the top of Home, or *Settings → Phone remote for your TV*. On an Android phone:
+   the **Remote** tab.
 
 It only accepts phones on your home network, and it can only tap, scroll and press buttons where you point.
 
@@ -94,7 +101,7 @@ Not affiliated with Stremio, VideoLAN or any IPTV provider.
 | | Needs |
 |---|---|
 | Mac + iPhone | Xcode 26, Homebrew `cmake ninja boost` |
-| Android TV | JDK 17, Android SDK (compileSdk 35) |
+| Android (TV + phone) | JDK 17, Android SDK (compileSdk 35) |
 
 ```sh
 ./Tools/build_libtorrent.sh          # once: builds libtorrent for Mac, iPhone and simulator (~1 min)
@@ -105,7 +112,8 @@ cd AndroidTV && ./gradlew assembleDebug
 Scripts in `Tools/`:
 - `make_release.sh`: builds all three downloads into `Release/` (Mac signing and notarization need a paid
   Apple Developer account; see `package.sh`)
-- `install.sh` (Mac), `install_iphone.sh` (connected iPhone), `install_tv.sh <tv-ip>` (TV over adb)
+- `install.sh` (Mac), `install_iphone.sh` (connected iPhone), `install_tv.sh <tv-ip>` (TV over adb),
+  `install_phone.sh` (Android phone over USB or wireless debugging)
 - `mock_xtream.py` and `mock_stremio.py`: local fake IPTV provider and Stremio account for development, with
   public-domain test videos (Blender's Sintel and Big Buck Bunny). Debug builds read test switches such as
   `-AntennaDevServer`, `-AntennaDevStremio` and `-AntennaDevTorrentBudgetMB` (see the sources).
@@ -113,7 +121,8 @@ Scripts in `Tools/`:
 ### Layout
 - `Shared/`: code used by the Mac and iPhone apps (Xtream client, Stremio client and add-on protocol, players,
   live rewind recorder, torrent streamer, Play on TV)
-- `Antenna/`: Mac app · `AntennaPhone/`: iPhone app · `AndroidTV/`: Android TV app (Kotlin, Compose for TV)
+- `Antenna/`: Mac app · `AntennaPhone/`: iPhone app · `AndroidTV/`: Android app for TVs and phones (Kotlin; Compose for TV
+  on TVs, Material 3 in `phone/` on phones)
 - `Shared/Torrent/ATTorrentEngine.mm`: Objective-C++ bridge to libtorrent
 
 ## License

@@ -10,7 +10,7 @@ cd "$ROOT/AndroidTV"
 ./gradlew assembleRelease --console=plain -q
 VERSION=$(grep versionName app/build.gradle.kts | sed -E 's/.*"(.*)".*/\1/')
 mkdir -p "$ROOT/Release"
-cp app/build/outputs/apk/release/app-release.apk "$ROOT/Release/Antenna-IPTV-AndroidTV-$VERSION.apk"
+cp app/build/outputs/apk/release/app-release.apk "$ROOT/Release/Antenna-IPTV-Android-$VERSION.apk"
 $ADB connect "$BOX" >/dev/null
-$ADB -s "$BOX" install -r "$ROOT/Release/Antenna-IPTV-AndroidTV-$VERSION.apk"
+$ADB -s "$BOX" install -r "$ROOT/Release/Antenna-IPTV-Android-$VERSION.apk"
 $ADB -s "$BOX" shell am start -n com.malick.antenna.tv/.MainActivity >/dev/null

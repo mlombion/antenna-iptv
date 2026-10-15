@@ -1,7 +1,7 @@
 #!/bin/zsh
 # Builds every download for a GitHub release into Release/:
 #   Antenna-IPTV-<v>.dmg              Mac, Developer ID signed and notarized (Tools/package.sh)
-#   Antenna-IPTV-AndroidTV-<v>.apk     Android TV / Google TV boxes and projectors
+#   Antenna-IPTV-Android-<v>.apk       Android TV / Google TV boxes, projectors and Android phones (one APK)
 #   Antenna-IPTV-iPhone-<v>.ipa        iPhone, unsigned: install with Sideloadly or AltStore, which sign it with your Apple ID
 # Needs Vendor/libtorrent.xcframework (Tools/build_libtorrent.sh) and JDK 17 + Android SDK for the TV app.
 set -e
@@ -13,11 +13,11 @@ mkdir -p Release
 echo "== Mac"
 ./Tools/package.sh "$@"
 
-echo "== Android TV"
+echo "== Android (TV + phone)"
 export JAVA_HOME=${JAVA_HOME:-/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}
 (cd AndroidTV && ./gradlew assembleRelease --console=plain -q)
 TV_VERSION=$(grep versionName AndroidTV/app/build.gradle.kts | sed -E 's/.*"(.*)".*/\1/')
-cp AndroidTV/app/build/outputs/apk/release/app-release.apk "Release/Antenna-IPTV-AndroidTV-$TV_VERSION.apk"
+cp AndroidTV/app/build/outputs/apk/release/app-release.apk "Release/Antenna-IPTV-Android-$TV_VERSION.apk"
 
 echo "== iPhone"
 xcodebuild -project Antenna.xcodeproj -scheme AntennaPhone -configuration Release -destination 'generic/platform=iOS' \

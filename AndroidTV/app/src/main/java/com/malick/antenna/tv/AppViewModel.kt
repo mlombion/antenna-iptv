@@ -42,6 +42,8 @@ data class Schedule(val current: Programme?, val upcoming: List<Programme>, val 
 
 class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
     val storage = Storage(app)
+    /** A TV or projector (remote control, big screen) rather than a phone. */
+    val isTv = DeviceKind.isTv(app)
     val player = TvPlayer(app)
 
     var phase by mutableStateOf(Phase.Launching); private set
@@ -82,6 +84,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
     /** Movies & Series from the user's Stremio account and add-ons. */
     val stremio = StremioModel(app, viewModelScope, storage, ::showToast) { hideAdult }
 
+    /** Phones only: Play on TV, the remote, and which tab shows. */
+    val phone by lazy { com.malick.antenna.tv.phone.PhoneModel(this, app, viewModelScope) }
+
     /** Lets a phone or computer on the same Wi-Fi send the login, so nobody types a password with the remote. */
     val pairing = PairingServer { name, server, user, pass -> viewModelScope.launch { login(name, server, user, pass) } }
 
@@ -94,7 +99,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
     private fun start() {
         val saved = storage.account
         val base = saved?.let { XtreamClient.normalize(it.server) }
-        if (saved == null || base == null) { phase = Phase.SignedOut; pairing.start(); return }
+        if (saved == null || base == null) { phase = Phase.SignedOut; if (isTv) pairing.start(); return }
         account = saved
         client = XtreamClient(base, saved.username, saved.password)
         val cached = storage.loadLineup()
@@ -107,7 +112,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
             viewModelScope.launch {
                 runCatching { load(client!!) }
                     .onSuccess { apply(it); storage.saveLineup(it); phase = Phase.Ready }
-                    .onFailure { loginError = it.message; phase = Phase.SignedOut; pairing.start() }
+                    .onFailure { loginError = it.message; phase = Phase.SignedOut; if (isTv) pairing.start() }
             }
         }
     }
@@ -143,7 +148,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
         allCategories = emptyList(); channels = emptyList(); reindex()
         epg.clear()
         phase = Phase.SignedOut
-        pairing.start()
+        if (isTv) pairing.start()
     }
 
     suspend fun refresh(silent: Boolean) {
@@ -404,6 +409,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app), CastHandler {
     }
 
     override fun onCleared() {
+        if (!isTv) phone.release()
         stremio.release()
         player.release()
         pairing.stop()
