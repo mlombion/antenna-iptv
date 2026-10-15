@@ -3,10 +3,13 @@
 # Notarization uses the Keychain profile "AntennaNotary" (created once with `xcrun notarytool store-credentials`).
 # Pass --skip-notarize to stop after signing.
 set -e
+setopt pipefail  # a failed build must stop here, not package an old one
 ROOT=${0:A:h:h}
 cd "$ROOT"
 # Your Apple Developer team (defaults to the one in the Xcode project) and notarization profile.
-TEAM=${ANTENNA_TEAM:-$(grep -m1 "DEVELOPMENT_TEAM = " Antenna.xcodeproj/project.pbxproj | sed -E 's/.*= ([A-Z0-9]+);/\1/')}
+# (the project ships with no team; then it comes from your Developer ID certificate).
+TEAM=${ANTENNA_TEAM:-$(grep -m1 -E "DEVELOPMENT_TEAM = [A-Z0-9]+;" Antenna.xcodeproj/project.pbxproj | sed -E 's/.*= ([A-Z0-9]+);/\1/')}
+[[ -n "$TEAM" ]] || TEAM=$(security find-identity -v -p codesigning | grep -m1 "Developer ID Application" | sed -E 's/.*\(([A-Z0-9]{10})\)".*/\1/')
 IDENTITY=${ANTENNA_SIGN_IDENTITY:-"Developer ID Application"}
 PROFILE=${ANTENNA_NOTARY_PROFILE:-AntennaNotary}
 

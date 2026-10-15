@@ -5,6 +5,7 @@
 #   Antenna-IPTV-iPhone-<v>.ipa        iPhone, unsigned: install with Sideloadly or AltStore, which sign it with your Apple ID
 # Needs Vendor/libtorrent.xcframework (Tools/build_libtorrent.sh) and JDK 17 + Android SDK for the TV app.
 set -e
+setopt pipefail
 ROOT=${0:A:h:h}
 cd "$ROOT"
 mkdir -p Release
